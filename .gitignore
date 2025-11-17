@@ -10,5 +10,5 @@ wheels/
 .venv
 venv/
 uv.lock
-audios/*
-ruidos/*
+base_samples/*
+test_samples/*
