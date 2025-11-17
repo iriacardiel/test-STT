@@ -1,0 +1,22 @@
+{
+  "1": "Give me information about the battlefield.",
+  "2": "Give me a status of the battlefield.",
+  "3": "Provide the situational picture.",
+  "4": "Run a weapon to target analysis.",
+  "5": "Proceed with a weapon to target analysis.",
+  "6": "Start a weapon to target analysis.",
+  "7": "Proceed with alternative A.",
+  "8": "Proceed with alternative B.",
+  "9": "Proceed with alternative C.",
+  "10": "Proceed with alternative D.",
+  "11": "Proceed with alternative E.",
+  "12": "Proceed with alternative F.",
+  "13": "Proceed with alternative G.",
+  "14": "Proceed with alternative H.",
+  "15": "Confirm.",
+  "16": "Cancel.",
+  "17": "Yes.",
+  "18": "No.",
+  "19": "What is the highest probability of success?",
+  "20": "What alternative has the highest combined kill probability?"
+}
