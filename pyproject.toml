@@ -9,5 +9,6 @@ dependencies = [
     "pydub",
     "requests",
     "pandas",
-    "openpyxl"
+    "openpyxl",
+    "python-dotenv>=1.0.1"
     ]

@@ -4,25 +4,31 @@ from pathlib import Path
 import re
 import json
 from time import sleep
+from settings import Settings
 
-def load_gold_standard(json_path='gold_standard.json'):
+RUNS = int(Settings.RUNS)
+STT_SERVICE_URL = Settings.STT_SERVICE_URL
+GOLD_STANDARD_FILE = Settings.GOLD_STANDARD_FILE
+TEST_FOLDER = Settings.TEST_FOLDER
+TEST_RESULT_FILE = Settings.TEST_RESULT_FILE
+
+def load_gold_standard(json_path=GOLD_STANDARD_FILE):
     """Load gold standard from JSON file."""
     try:
         with open(json_path, 'r') as f:
             data = json.load(f)
-        # Convert string keys to integers
+        
         return {int(k): v for k, v in data.items()}
     except FileNotFoundError:
-        print(f"Error: {json_path} not found. Please create it first.")
+        print(f"Error: {json_path} not found.")
         return {}
 
 def transcribe_audio(file_path):
     """Send audio file to transcription service and return the text."""
-    url = "http://localhost:8000/transcribe"
     
     with open(file_path, "rb") as f:
         files = {"file": (file_path.name, f, "audio/wav")}
-        response = requests.post(url, files=files)
+        response = requests.post(STT_SERVICE_URL, files=files)
     
     if response.status_code == 200:
         return response.json()["transcription"]
@@ -30,21 +36,21 @@ def transcribe_audio(file_path):
         raise Exception(f"Error: {response.json()}")
 
 def parse_filename(filename):
-    """Extract sample number and noise level from filename."""
+    """Extract sample number and sample noise rate from filename."""
     match = re.match(r'sample_(\d+)_noise_(\d+)\.wav', filename)
     if match:
         sample_num = int(match.group(1))
-        noise_level = int(match.group(2))
-        return sample_num, noise_level
+        sample_noise_rate = int(match.group(2))
+        return sample_num, sample_noise_rate
     return None, None
 
 def exact_match(transcription, gold_standard):
     """Check if transcription matches gold standard (case-insensitive)."""
     if transcription == "ERROR" or gold_standard is None:
         return False
-    return transcription.lower().strip() == gold_standard.lower().strip()
+    return transcription.lower().strip().strip(".") == gold_standard.lower().strip().strip(".")
 
-def transcribe_folder(folder_path="test_samples", gold_standard_path="gold_standard.json", runs=3):
+def stt_test(folder_path=TEST_FOLDER, gold_standard_path=GOLD_STANDARD_FILE, runs=RUNS):
     """Transcribe all .wav files multiple times and create Excel report with gold standard comparison."""
     # Load gold standard
     GOLD_STANDARD = load_gold_standard(gold_standard_path)
@@ -70,7 +76,7 @@ def transcribe_folder(folder_path="test_samples", gold_standard_path="gold_stand
     run_count = 0
     
     for wav_file in wav_files:
-        sample_num, noise_level = parse_filename(wav_file.name)
+        sample_num, sample_noise_rate = parse_filename(wav_file.name)
         gold = GOLD_STANDARD.get(sample_num, "")
         
         # Run each file multiple times
@@ -91,7 +97,7 @@ def transcribe_folder(folder_path="test_samples", gold_standard_path="gold_stand
             results.append({
                 "filename": wav_file.name,
                 "sample": sample_num,
-                "noise_level": noise_level,
+                "sample_noise_rate": sample_noise_rate,
                 "run": run,
                 "gold_standard": gold,
                 "transcription": transcription,
@@ -100,30 +106,26 @@ def transcribe_folder(folder_path="test_samples", gold_standard_path="gold_stand
             
             # Small delay to avoid overwhelming the service
             if run < runs:
-                sleep(0.1)
+                sleep(1)
     
     # Create DataFrame
     df = pd.DataFrame(results)
     
     # Sort by sample number, noise level, and run
-    df = df.sort_values(by=["sample", "noise_level", "run"])
+    df = df.sort_values(by=["sample", "sample_noise_rate", "run"])
     
     # Save detailed results to Excel
-    output_file = "transcriptions_detailed.xlsx"
+    output_file = TEST_RESULT_FILE
     df.to_excel(output_file, index=False, engine='openpyxl')
     print(f"\n✓ Detailed results saved to {output_file}")
     
     # Create aggregated statistics
-    agg_stats = df.groupby(['sample', 'noise_level', 'gold_standard']).agg({
+    agg_stats = df.groupby(['sample', 'sample_noise_rate', 'gold_standard']).agg({
         'exact_match': ['sum', 'count', 'mean'],
         'transcription': lambda x: ' | '.join(x)
     }).reset_index()
-    agg_stats.columns = ['sample', 'noise_level', 'gold_standard', 'matches', 'total_runs', 'accuracy', 'all_transcriptions']
+    agg_stats.columns = ['sample', 'sample_noise_rate', 'gold_standard', 'matches', 'total_runs', 'accuracy', 'all_transcriptions']
     agg_stats['accuracy'] = (agg_stats['accuracy'] * 100).round(2)
-    
-    output_agg_file = "transcriptions_aggregated.xlsx"
-    agg_stats.to_excel(output_agg_file, index=False, engine='openpyxl')
-    print(f"✓ Aggregated results saved to {output_agg_file}")
     
     # Print overall statistics
     total = len(df)
@@ -137,11 +139,11 @@ def transcribe_folder(folder_path="test_samples", gold_standard_path="gold_stand
     print(f"  Exact matches: {matches}")
     print(f"  Overall accuracy: {accuracy:.2f}%")
     
-    # Accuracy by noise level
+    # Accuracy by sample-noise rate
     print(f"\n{'='*60}")
-    print(f"ACCURACY BY NOISE LEVEL")
+    print(f"ACCURACY BY SAMPLE-NOISE RATE")
     print(f"{'='*60}")
-    noise_stats = df.groupby('noise_level').agg({
+    noise_stats = df.groupby('sample_noise_rate').agg({
         'exact_match': ['sum', 'count', lambda x: (x.sum() / len(x) * 100)]
     }).round(2)
     noise_stats.columns = ['Matches', 'Total', 'Accuracy (%)']
@@ -164,11 +166,11 @@ def transcribe_folder(folder_path="test_samples", gold_standard_path="gold_stand
     consistency = agg_stats[agg_stats['matches'].between(1, runs-1)]
     if len(consistency) > 0:
         print(f"Found {len(consistency)} sample/noise combinations with inconsistent results:")
-        print(consistency[['sample', 'noise_level', 'matches', 'total_runs', 'accuracy']])
+        print(consistency[['sample', 'sample_noise_rate', 'matches', 'total_runs', 'accuracy']])
     else:
         print("All samples produced consistent results across runs!")
     
     return df, agg_stats
 
 if __name__ == "__main__":
-    df, agg_stats = transcribe_folder("test_samples", "gold_standard.json", runs=3)
+    df = stt_test()
