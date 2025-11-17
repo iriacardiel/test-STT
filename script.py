@@ -35,15 +35,15 @@ def add_white_noise(audio_path, output_path, snr_db):
 # ---------------------------------------
 input_folder = "audios"      # carpeta donde tienes tus WAVs
 output_folder = "ruidos"     # carpeta de salida
-snr_db = 10                  # Nivel de ruido (menor = más ruido)
 
 os.makedirs(output_folder, exist_ok=True)
 
 for filename in os.listdir(input_folder):
     if filename.startswith("muestra") and filename.endswith(".wav"):
         input_path = os.path.join(input_folder, filename)
-        output_path = os.path.join(output_folder, filename.replace(".wav", "_ruido.wav"))
-
-        add_white_noise(input_path, output_path, snr_db)
+        
+        for snr_db in [0,5,10,15,20,25,30,35,40]: # Sound Noise Rate: 0dB ruido = señal, Casi ininteligible | 40 dB prácticamente limpio
+            output_path = os.path.join(output_folder, filename.replace(".wav", f"_ruido_{snr_db}.wav"))
+            add_white_noise(input_path, output_path, snr_db)
 
 print("\n🎉 Proceso completado.")

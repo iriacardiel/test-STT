@@ -10,3 +10,5 @@ wheels/
 .venv
 venv/
 uv.lock
+audios/*
+ruidos/*
